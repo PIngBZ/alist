@@ -180,7 +180,7 @@ func OutAlistInit() {
 	ServerCmd.Run(cmd, args)
 }
 
-func ELE_Run(publicHttp bool) (httpPort int, quit chan bool) {
+func ELE_Run() (httpPort int, quit chan bool) {
 	Init()
 
 	bootstrap.LoadStorages()
