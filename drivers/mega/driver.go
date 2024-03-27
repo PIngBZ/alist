@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/alist-org/alist/v3/pkg/http_range"
-	"github.com/rclone/rclone/lib/readers"
 
 	"github.com/alist-org/alist/v3/internal/driver"
 	"github.com/alist-org/alist/v3/internal/errs"
@@ -17,6 +16,25 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/t3rm1n4l/go-mega"
 )
+
+// LimitedReadCloser adds io.Closer to io.LimitedReader.  Create one with NewLimitedReadCloser
+type LimitedReadCloser struct {
+	*io.LimitedReader
+	io.Closer
+}
+
+// NewLimitedReadCloser returns a LimitedReadCloser wrapping rc to
+// limit it to reading limit bytes. If limit < 0 then it does not
+// wrap rc, it just returns it.
+func NewLimitedReadCloser(rc io.ReadCloser, limit int64) (lrc io.ReadCloser) {
+	if limit < 0 {
+		return rc
+	}
+	return &LimitedReadCloser{
+		LimitedReader: &io.LimitedReader{R: rc, N: limit},
+		Closer:        rc,
+	}
+}
 
 type Mega struct {
 	model.Storage
@@ -96,7 +114,7 @@ func (d *Mega) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*
 			}
 			finalClosers.Add(oo)
 
-			return readers.NewLimitedReadCloser(oo, length), nil
+			return NewLimitedReadCloser(oo, length), nil
 		}
 		resultRangeReadCloser := &model.RangeReadCloser{RangeReader: resultRangeReader, Closers: finalClosers}
 		resultLink := &model.Link{
