@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -22,7 +23,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func ELE_EditConfig(publicHttp bool, jwtSecret string, webSrc string) {
+func ELE_EditConfig(publicHttp bool, jwtSecret string) {
 	if flags.Debug || flags.Dev {
 		publicHttp = true
 		conf.Conf.Log.Enable = true
@@ -40,12 +41,12 @@ func ELE_EditConfig(publicHttp bool, jwtSecret string, webSrc string) {
 
 	conf.Conf.JwtSecret = jwtSecret
 	conf.Conf.TokenExpiresIn = 24 * 365
-	conf.Conf.DistDir = webSrc
+	conf.Conf.DistDir = filepath.Join(flags.DataDir, "web")
 }
 
-func ELE_Run(publicHttp bool, jwtSecret string, webSrc string) (httpPort int, token string, quit chan bool, err error) {
+func ELE_Run(publicHttp bool, jwtSecret string) (httpPort int, token string, quit chan bool, err error) {
 	bootstrap.InitConfig()
-	ELE_EditConfig(publicHttp, jwtSecret, webSrc)
+	ELE_EditConfig(publicHttp, jwtSecret)
 	bootstrap.Log()
 	bootstrap.InitDB()
 	data.InitData()
