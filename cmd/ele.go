@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -62,25 +61,18 @@ func ELE_Run(publicHttp bool, jwtSecret string) (httpPort int, token string, qui
 	r.Use(gin.LoggerWithWriter(log.StandardLogger().Out), gin.RecoveryWithWriter(log.StandardLogger().Out))
 	server.Init(r)
 
-	var httpSrv *http.Server
-	if conf.Conf.Scheme.HttpPort != -1 {
-		httpBase := fmt.Sprintf("%s:%d", conf.Conf.Scheme.Address, conf.Conf.Scheme.HttpPort)
-		utils.Log.Infof("start HTTP server @ %s", httpBase)
-		httpSrv = &http.Server{Addr: httpBase, Handler: r}
-		var listener net.Listener
-		listener, err = net.Listen("tcp", httpBase)
-		if err != nil {
-			utils.Log.Fatalf("failed to start http: %s", err.Error())
-			return
-		}
-		go func() {
-			httpPort = listener.Addr().(*net.TCPAddr).Port
-			err := httpSrv.Serve(listener)
-			if err != nil && !errors.Is(err, http.ErrServerClosed) {
-				utils.Log.Fatalf("failed to start http: %s", err.Error())
-			}
-		}()
+	httpBase := fmt.Sprintf("%s:%d", conf.Conf.Scheme.Address, conf.Conf.Scheme.HttpPort)
+	utils.Log.Infof("start HTTP server @ %s", httpBase)
+	httpSrv := &http.Server{Addr: httpBase, Handler: r}
+	var listener net.Listener
+	listener, err = net.Listen("tcp", httpBase)
+	if err != nil {
+		utils.Log.Fatalf("failed to start http: %s", err.Error())
+		return
 	}
+	httpPort = listener.Addr().(*net.TCPAddr).Port
+	go httpSrv.Serve(listener)
+
 	s3r := gin.New()
 	s3r.Use(gin.LoggerWithWriter(log.StandardLogger().Out), gin.RecoveryWithWriter(log.StandardLogger().Out))
 	server.InitS3(s3r)
@@ -93,15 +85,13 @@ func ELE_Run(publicHttp bool, jwtSecret string) (httpPort int, token string, qui
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 		defer cancel()
 		var wg sync.WaitGroup
-		if conf.Conf.Scheme.HttpPort != -1 {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				if err := httpSrv.Shutdown(ctx); err != nil {
-					utils.Log.Fatal("HTTP server shutdown err: ", err)
-				}
-			}()
-		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := httpSrv.Shutdown(ctx); err != nil {
+				utils.Log.Fatal("HTTP server shutdown err: ", err)
+			}
+		}()
 		wg.Wait()
 		utils.Log.Println("Server exit")
 	}()
